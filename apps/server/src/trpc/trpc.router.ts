@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Res,
+  Param,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { TrpcService } from '@server/trpc/trpc.service';
@@ -15,9 +16,9 @@ import * as path from 'path';
 
 @Controller('files')
 export class FileController {
-  @Get('download')
-  downloadFile(@Res() res: Response) {
-    const fileName = 'lv5xShBIDPe7m4ufdlV0IAc7Avk.jpg';
+  @Get('download/:fileName')
+  downloadFile(@Param('fileName') fileName: string, @Res() res: Response) {
+    fileName = 'downloaded-fil.jfif';
     const filePath = path.join(__dirname, '../..', 'uploads', fileName);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
