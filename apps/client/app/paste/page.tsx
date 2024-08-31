@@ -4,7 +4,7 @@ import React, { useState } from "react";
 function Paste() {
   const [text, setText] = useState<string>("");
   const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    setText(event.target.value); // Update fileName state
+    setText(event.target.value);
   };
   const downloadFile = async () => {
     if (!text) {
@@ -18,7 +18,6 @@ function Paste() {
           }
         );
 
-        // Ensure the response is successful
         if (!response.ok) {
           throw new Error("Failed to download file");
         }
