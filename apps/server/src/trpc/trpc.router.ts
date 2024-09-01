@@ -16,6 +16,14 @@ import * as archiver from 'archiver';
 import * as fs from 'fs';
 import { Response } from 'express';
 import * as path from 'path';
+
+function* createIncrementer() {
+  let count = 0;
+  while (true) {
+    yield count++;
+  }
+}
+const incrementer = createIncrementer();
 // import { v4 as uuidv4 } from 'uuid'; // Import uuid to generate unique keys
 
 @Controller('files')
@@ -171,7 +179,7 @@ export class TrpcRouter {
         console.log(req.file, req.files);
         if (file) {
           //   const uniqueKey = `upload_${uuidv4()}`;
-          const uniqueKey = `123456`;
+          const uniqueKey = String(incrementer.next().value);
           // Store the uploaded file name in Redis list
           await this.redisService.createFileRecord(
             uniqueKey,
