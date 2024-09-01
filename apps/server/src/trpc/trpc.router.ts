@@ -21,25 +21,60 @@ import * as path from 'path';
 @Controller('files')
 export class FileController {
   constructor(private readonly redisService: RedisService) {}
-  @Get('download/:fileName')
-  async downloadFile(
-    @Param('fileName') fileName: string,
-    @Res() res: Response,
-  ) {
-    // fileName = 'downloaded-fil.jfif';
-    const filePath = path.join(__dirname, '../..', 'uploads', fileName);
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  //   @Get('download/:fileName')
+  //   async downloadFile(
+  //     @Param('fileName') fileName: string,
+  //     @Res() res: Response,
+  //   ) {
+  //     // fileName = 'downloaded-fil.jfif';
+  //     const filePath = path.join(__dirname, '../..', 'uploads', fileName);
+  //     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+  //     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
-    // Stream the file to the client
-    res.download(filePath, async (err) => {
-      if (err) {
-        console.error('Error downloading the file:', err);
-        res.status(500).send('Error downloading the file.');
-      } else {
-        await this.redisService.addFileToList('fileList', fileName);
+  //     // Stream the file to the client
+  //     res.download(filePath, async (err) => {
+  //       if (err) {
+  //         console.error('Error downloading the file:', err);
+  //         res.status(500).send('Error downloading the file.');
+  //       } else {
+  //         await this.redisService.addFileToList('fileList', fileName);
+  //       }
+  //     });
+  //   }
+  @Get('download/:key')
+  async downloadFile(@Param('key') key: string, @Res() res: Response) {
+    try {
+      // Fetch the list of files from Redis for the given key
+      const fileNames = await this.redisService.getFileRecord(key);
+
+      if (!fileNames || fileNames.length === 0) {
+        return res.status(404).send('No files found for the provided key.');
       }
-    });
+
+      // For simplicity, assuming the first file in the list is to be downloaded
+      const fileName = fileNames[0]; // You can adjust this based on your logic
+      const filePath = path.join(__dirname, '../..', 'uploads', fileName);
+
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${fileName}"`,
+      );
+
+      // Stream the file to the client
+      res.download(filePath, async (err) => {
+        if (err) {
+          console.error('Error downloading the file:', err);
+          res.status(500).send('Error downloading the file.');
+        } else {
+          // Optionally, log this download or perform additional actions here
+          await this.redisService.addFileToList('fileDownloadLog', fileName);
+        }
+      });
+    } catch (error) {
+      console.error('Error occurred:', error);
+      res.status(500).send('An error occurred while downloading the file.');
+    }
   }
 
   @Get('download-all')
@@ -69,41 +104,24 @@ export class FileController {
       await this.redisService.addFileToList('fileList', file);
     });
   }
-  // @Get('download/:key')
-  // async downloadFile(@Param('key') key: string, @Res() res: Response) {
-  //   try {
-  //     // Fetch the list of files from Redis for the given key
-  //     const fileNames = await this.redisService.getFileRecord(key);
 
-  //     if (!fileNames || fileNames.length === 0) {
-  //       return res.status(404).send('No files found for the provided key.');
-  //     }
+  @Get('files-by-key/:key')
+  async getFilesByKey(@Param('key') key: string, @Res() res: Response) {
+    try {
+      // Fetch the file list from Redis based on the key
+      const fileList = await this.redisService.getFileRecord(key);
 
-  //     // For simplicity, assuming the first file in the list is to be downloaded
-  //     const fileName = fileNames[0]; // You can adjust this based on your logic
-  //     const filePath = path.join(__dirname, '../..', 'uploads', fileName);
+      if (fileList && fileList.length > 0) {
+        res.json({ key, fileList });
+      } else {
+        res.status(404).json({ message: `No files found for key: ${key}` });
+      }
+    } catch (error) {
+      console.error('Error fetching files from Redis:', error);
+      res.status(500).json({ message: 'Error retrieving files' });
+    }
+  }
 
-  //     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-  //     res.setHeader(
-  //       'Content-Disposition',
-  //       `attachment; filename="${fileName}"`,
-  //     );
-
-  //     // Stream the file to the client
-  //     res.download(filePath, async (err) => {
-  //       if (err) {
-  //         console.error('Error downloading the file:', err);
-  //         res.status(500).send('Error downloading the file.');
-  //       } else {
-  //         // Optionally, log this download or perform additional actions here
-  //         await this.redisService.addFileToList('fileDownloadLog', fileName);
-  //       }
-  //     });
-  //   } catch (error) {
-  //     console.error('Error occurred:', error);
-  //     res.status(500).send('An error occurred while downloading the file.');
-  //   }
-  // }
   @Get('list/:key')
   async getFileList(@Param('key') key: string, @Res() res: Response) {
     const fileList = await this.redisService.getFileRecord(key);
@@ -144,36 +162,37 @@ export class TrpcRouter {
     });
     const upload = multer({ storage });
 
-    // app.use(
-    //   '/trpc/upload',
-    //   upload.single('file'),
-    //   async (req: any, res: any) => {
-    //     const file = req.file;
-    //     const text = req.body.text;
-    //     console.log(req.file, req.files);
-    //     if (file) {
-    //       const uniqueKey = `upload_${uuidv4()}`;
-    //       // Store the uploaded file name in Redis list
-    //       await this.redisService.createFileRecord(
-    //         uniqueKey,
-    //         file.originalname,
-    //       );
+    app.use(
+      '/trpc/upload',
+      upload.single('file'),
+      async (req: any, res: any) => {
+        const file = req.file;
+        const text = req.body.text;
+        console.log(req.file, req.files);
+        if (file) {
+          //   const uniqueKey = `upload_${uuidv4()}`;
+          const uniqueKey = `123456`;
+          // Store the uploaded file name in Redis list
+          await this.redisService.createFileRecord(
+            uniqueKey,
+            file.originalname,
+          );
 
-    //       res.json({ key: uniqueKey, fileName: file.originalname });
-    //     } else {
-    //       res.status(400).send('No file uploaded');
-    //     }
-    //   },
-    // );
+          res.json({ key: uniqueKey, fileName: file.originalname });
+        } else {
+          res.status(400).send('No file uploaded');
+        }
+      },
+    );
 
-    app.use('/trpc/upload', upload.single('file'), (req: any, res: any) => {
-      const file = req.file;
-      const text = req.body.text;
-      console.log(req.file, req.files);
+    // app.use('/trpc/upload', upload.single('file'), (req: any, res: any) => {
+    //   const file = req.file;
+    //   const text = req.body.text;
+    //   console.log(req.file, req.files);
 
-      // Process the uploaded file and text as needed
-      res.json({ file, text });
-    });
+    //   // Process the uploaded file and text as needed
+    //   res.json({ file, text });
+    // });
 
     app.use(
       `/trpc`,
