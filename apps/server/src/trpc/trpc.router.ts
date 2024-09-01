@@ -11,6 +11,7 @@ import { TrpcService } from '@server/trpc/trpc.service';
 import * as trpcExpress from '@trpc/server/adapters/express';
 import * as multer from 'multer';
 import { RedisService } from './redisService'; // Import RedisService
+import * as archiver from 'archiver';
 
 import * as fs from 'fs';
 import { Response } from 'express';
@@ -25,7 +26,7 @@ export class FileController {
     @Param('fileName') fileName: string,
     @Res() res: Response,
   ) {
-    fileName = 'downloaded-fil.jfif';
+    // fileName = 'downloaded-fil.jfif';
     const filePath = path.join(__dirname, '../..', 'uploads', fileName);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
@@ -38,6 +39,34 @@ export class FileController {
       } else {
         await this.redisService.addFileToList('fileList', fileName);
       }
+    });
+  }
+
+  @Get('download-all')
+  async downloadAllFiles(@Res() res: Response) {
+    const uploadsDir = path.join(__dirname, '../..', 'uploads');
+
+    // Create a zip archive and set the appropriate headers
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader('Content-Disposition', 'attachment; filename="files.zip"');
+    res.setHeader('Content-Type', 'application/zip');
+
+    // Stream the zip archive to the response
+    archive.pipe(res);
+
+    // Add each file in the uploads directory to the zip archive
+    fs.readdirSync(uploadsDir).forEach((file) => {
+      const filePath = path.join(uploadsDir, file);
+      archive.file(filePath, { name: file });
+    });
+
+    // Finalize the archive when all files have been added
+    archive.finalize();
+
+    // Optionally log the files to Redis
+    fs.readdirSync(uploadsDir).forEach(async (file) => {
+      await this.redisService.addFileToList('fileList', file);
     });
   }
   // @Get('download/:key')

@@ -12,7 +12,8 @@ function Paste() {
     } else {
       try {
         const response = await fetch(
-          `http://localhost:4000/files/download/${text}`,
+          //   `http://localhost:4000/files/download/${text}`,
+          `http://localhost:4000/files/download-all`,
           {
             method: "GET",
           }

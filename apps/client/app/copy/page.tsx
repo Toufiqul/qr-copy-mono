@@ -93,7 +93,10 @@ function Copy() {
         />
         <input type="file" onChange={handleFileChange} />
         <div>
-          <button className="border-2 border-black" type="submit">
+          <button
+            className="border-2 border-black bg-white text-black px-2"
+            type="submit"
+          >
             Upload
           </button>
         </div>
